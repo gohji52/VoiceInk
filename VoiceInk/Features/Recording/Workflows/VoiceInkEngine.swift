@@ -160,6 +160,11 @@ class VoiceInkEngine: NSObject, ObservableObject {
 
         super.init()
 
+        // [custom] Cloud → local fallback needs the downloaded models.
+        self.pipeline.usableModelsProvider = { [weak transcriptionModelManager] in
+            transcriptionModelManager?.usableModels ?? []
+        }
+
         setupNotifications()
         createRecordingsDirectoryIfNeeded()
     }
@@ -300,7 +305,7 @@ class VoiceInkEngine: NSObject, ObservableObject {
                                 transcriptionModelManager: self.transcriptionModelManager
                             )
                             guard
-                                let transcriptionConfiguration = ModeRuntimeResolver.transcriptionConfiguration(
+                                let resolvedTranscriptionConfiguration = ModeRuntimeResolver.transcriptionConfiguration(
                                     from: modelResolution
                                 )
                             else {
@@ -321,6 +326,14 @@ class VoiceInkEngine: NSObject, ObservableObject {
                                 await self.recorderUIManager?.dismissRecorderPanel()
                                 return
                             }
+
+                            // [custom] Local-only mode or a recent cloud failure starts with the local model.
+                            let routedTranscriptionConfiguration = CloudFallbackPolicy.shared.routedConfiguration(
+                                resolvedTranscriptionConfiguration,
+                                usableModels: self.transcriptionModelManager.usableModels
+                            )
+                            let transcriptionConfiguration =
+                                routedTranscriptionConfiguration ?? resolvedTranscriptionConfiguration
 
                             if self.serviceRegistry.shouldUseRealtimeTranscription(for: transcriptionConfiguration) {
                                 let session = self.serviceRegistry.createSession(
@@ -356,7 +369,8 @@ class VoiceInkEngine: NSObject, ObservableObject {
                                 }
                             } else {
                                 self.currentSession = nil
-                                self.currentSessionTranscriptionConfiguration = nil
+                                // [custom] Keep a routed (local) configuration so the pipeline uses it.
+                                self.currentSessionTranscriptionConfiguration = routedTranscriptionConfiguration
                                 self.recorder.onAudioChunk = nil
                                 _ = realtimeAudioGate.reset()
                             }
@@ -366,9 +380,11 @@ class VoiceInkEngine: NSObject, ObservableObject {
                             Task { @MainActor [weak self] in
                                 guard let self else { return }
 
-                                let currentModel = ModeRuntimeResolver.transcriptionConfiguration(
-                                    transcriptionModelManager: self.transcriptionModelManager
-                                )?.model
+                                // [custom] Preload the routed local model when the cloud is bypassed.
+                                let currentModel = routedTranscriptionConfiguration?.model
+                                    ?? ModeRuntimeResolver.transcriptionConfiguration(
+                                        transcriptionModelManager: self.transcriptionModelManager
+                                    )?.model
 
                                 if let model = currentModel,
                                     model.provider == .whisper

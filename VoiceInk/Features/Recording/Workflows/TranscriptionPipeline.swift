@@ -26,6 +26,8 @@ class TranscriptionPipeline {
     private let serviceRegistry: TranscriptionServiceRegistry
     private let enhancementService: AIEnhancementService?
     private let delivery = TranscriptionDelivery()
+    /// [custom] Supplies downloaded models for the cloud → local fallback.
+    var usableModelsProvider: () -> [any TranscriptionModel] = { [] }
     private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "TranscriptionPipeline")
 
     init(
@@ -102,14 +104,42 @@ class TranscriptionPipeline {
         do {
             let transcriptionStart = Date()
             var text: String
-            if let session {
-                text = try await session.transcribe(audioURL: audioURL)
-            } else {
+            var fallbackModelName: String?
+            do {
+                if let session {
+                    text = try await session.transcribe(audioURL: audioURL)
+                } else {
+                    text = try await serviceRegistry.transcribe(
+                        audioURL: audioURL,
+                        model: model,
+                        context: transcriptionConfiguration.requestContext
+                    )
+                }
+                CloudFallbackPolicy.shared.recordSuccess(for: model.provider)
+            } catch {
+                // [custom] Cloud failure → retry with the local Whisper model.
+                guard !shouldCancel(),
+                    let fallback = CloudFallbackPolicy.shared.fallbackConfiguration(
+                        for: transcriptionConfiguration,
+                        error: error,
+                        usableModels: usableModelsProvider()
+                    )
+                else {
+                    throw error
+                }
+                NotificationManager.shared.showNotification(
+                    title: String(
+                        format: String(localized: "%@ failed. Using %@ instead."),
+                        model.displayName, fallback.model.displayName),
+                    type: .warning,
+                    duration: 4.0
+                )
                 text = try await serviceRegistry.transcribe(
                     audioURL: audioURL,
-                    model: model,
-                    context: transcriptionConfiguration.requestContext
+                    model: fallback.model,
+                    context: fallback.requestContext
                 )
+                fallbackModelName = "\(fallback.model.displayName) (fallback)"
             }
             text = TranscriptionOutputFilter.filter(text)
             let transcriptionDuration = Date().timeIntervalSince(transcriptionStart)
@@ -146,7 +176,7 @@ class TranscriptionPipeline {
 
             transcription.text = cleanedText
             transcription.duration = actualDuration
-            transcription.transcriptionModelName = model.displayName
+            transcription.transcriptionModelName = fallbackModelName ?? model.displayName
             transcription.transcriptionDuration = transcriptionDuration
             transcription.modeName = modeMetadata.name
             transcription.modeEmoji = modeMetadata.emoji

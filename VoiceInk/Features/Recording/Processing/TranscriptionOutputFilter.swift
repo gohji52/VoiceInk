@@ -27,8 +27,9 @@ struct TranscriptionOutputFilter {
         }
 
         // Remove configured filler words. An empty list is naturally a no-op.
-        for fillerWord in FillerWordManager.shared.fillerWords {
-            let pattern = "\\b\(NSRegularExpression.escapedPattern(for: fillerWord))\\b[,.]?"
+        // [custom] Japanese-aware patterns (no `\b` for non-ASCII words), longest first.
+        for fillerWord in FillerWordPattern.ordered(FillerWordManager.shared.fillerWords) {
+            let pattern = FillerWordPattern.pattern(for: fillerWord)
             if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
                 let range = NSRange(filteredText.startIndex..., in: filteredText)
                 filteredText = regex.stringByReplacingMatches(

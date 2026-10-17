@@ -6,6 +6,8 @@ class FillerWordManager: ObservableObject {
     static let defaultFillerWords = [
         "uh", "um", "uhm", "umm", "uhh", "uhhh",
         "hmm", "hm", "mmm", "mm", "mh", "ehh",
+        // [custom] Japanese fillers. Plain "あの" / "まあ" are left out because they are also normal words.
+        "えーっと", "えーと", "えっと", "えー", "あのー", "うーん", "んー",
     ]
 
     private let fillerWordsKey = "FillerWords"

@@ -89,19 +89,41 @@ class OllamaService: ObservableObject {
         let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestModel = (trimmedModel?.isEmpty == false ? trimmedModel : nil) ?? selectedModel
 
+        // [custom] Send num_ctx / keep_alive explicitly (LLMkit cannot) to bound Ollama memory use.
+        let request: URLRequest
         do {
-            return try await OllamaClient.generate(
+            request = try OllamaSafeGenerateRequest.make(
                 baseURL: url,
                 model: requestModel,
                 prompt: text,
                 systemPrompt: systemPrompt,
-                options: OllamaGenerationOptions(temperature: defaultTemperature),
-                think: false,
+                temperature: defaultTemperature,
                 timeout: timeout
             )
-        } catch let error as LLMKitError {
-            throw mapLLMKitError(error)
+        } catch {
+            throw LocalAIError.invalidRequest
         }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch let error as URLError where error.code == .timedOut {
+            throw LocalAIError.timeout
+        } catch {
+            throw LocalAIError.serviceUnavailable
+        }
+
+        if let httpResponse = response as? HTTPURLResponse, !(200..<300).contains(httpResponse.statusCode) {
+            if httpResponse.statusCode == 404 { throw LocalAIError.modelNotFound }
+            if httpResponse.statusCode == 500 { throw LocalAIError.serverError }
+            throw LocalAIError.invalidResponse
+        }
+
+        guard let decoded = try? JSONDecoder().decode(OllamaSafeGenerateRequest.Response.self, from: data) else {
+            throw LocalAIError.invalidResponse
+        }
+        return decoded.response
     }
 
     private func mapLLMKitError(_ error: LLMKitError) -> LocalAIError {

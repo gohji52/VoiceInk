@@ -16,6 +16,8 @@ struct MenuBarView: View {
     @ObservedObject private var modeManager = ModeManager.shared
     @ObservedObject var audioDeviceManager = AudioDeviceManager.shared
     @AppStorage(OnboardingSettings.completedV2Key) private var hasCompletedOnboardingV2 = false
+    // [custom] Skip the cloud provider and transcribe with the local Whisper model.
+    @AppStorage(CloudFallbackPolicy.localOnlyKey) private var isLocalOnlyMode = false
 
     var body: some View {
         VStack {
@@ -147,6 +149,8 @@ struct MenuBarView: View {
                 )
             )
             .disabled(launchAtLoginManager.isUpdating)
+
+            Toggle("Local Only (Free)", isOn: $isLocalOnlyMode)
 
             Divider()
 
