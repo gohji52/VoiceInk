@@ -18,12 +18,18 @@ enum CorrectionDiffEngine {
 
     private static let trailingSentencePunctuation: Set<Character> = [
         ".", ",", "!", "?", ";", ":", "…",
+        // [custom] Japanese sentence punctuation.
+        "。", "、", "！", "？", "；", "：",
     ]
     private static let leadingWrappers: Set<Character> = [
         "\"", "“", "‘", "(", "[", "{",
+        // [custom] Japanese brackets.
+        "「", "『", "（", "【",
     ]
     private static let structuralSeparators: Set<Character> = [
         ",", "!", "?", ";", ":", "…", "(", ")", "[", "]", "{", "}", "\"", "“", "”",
+        // [custom] Japanese punctuation and brackets split unspaced text into clauses.
+        "。", "、", "！", "？", "；", "：", "「", "」", "『", "』", "（", "）", "【", "】",
     ]
 
     static func candidates(from revision: AutoLearnRevision) -> [DetectedCorrectionCandidate] {
@@ -63,9 +69,22 @@ enum CorrectionDiffEngine {
                     segments: correctedSegments,
                     segmentRange: hunk.correctedRange
                 ),
-                let pair = cleanedPair(source: source, destination: destination)
+                let cleaned = cleanedPair(source: source, destination: destination)
             else {
                 continue
+            }
+
+            // [custom] Narrow Japanese edits to the changed term (see CJKCorrectionNarrower).
+            var pair = cleaned
+            var narrowedSnippets: (original: String, corrected: String)?
+            switch CJKCorrectionNarrower.narrow(source: cleaned.source, destination: cleaned.destination) {
+            case .notApplicable:
+                break
+            case .skip:
+                continue
+            case .narrowed(let narrowed):
+                pair = (narrowed.source, narrowed.destination)
+                narrowedSnippets = (narrowed.originalSnippet, narrowed.correctedSnippet)
             }
 
             let previousHunk = hunkIndex > 0 ? hunks[hunkIndex - 1] : nil
@@ -112,8 +131,8 @@ enum CorrectionDiffEngine {
 
             results.append(
                 DetectedCorrectionCandidate(
-                    originalText: originalSnippet,
-                    correctedText: correctedSnippet
+                    originalText: narrowedSnippets?.original ?? originalSnippet,
+                    correctedText: narrowedSnippets?.corrected ?? correctedSnippet
                 ))
         }
 
