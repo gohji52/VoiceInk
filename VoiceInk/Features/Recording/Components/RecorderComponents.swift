@@ -304,19 +304,21 @@ struct RecorderModeButton: View {
 
 struct LiveTranscriptView: View {
     let text: String
+    // [custom] Font and area size follow Settings → Live Text Size.
+    var textSize: LiveTranscriptTextSize = .standard
 
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: false) {
                 Text(text)
-                    .font(.system(size: 12))
+                    .font(.system(size: textSize.fontSize))
                     .foregroundColor(.white.opacity(0.8))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 6)
                     .id("bottom")
             }
-            .frame(height: 56)
+            .frame(height: textSize.transcriptHeight)
             .mask(
                 LinearGradient(
                     stops: [

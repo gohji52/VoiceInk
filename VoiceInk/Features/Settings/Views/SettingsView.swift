@@ -24,6 +24,7 @@ struct SettingsView: View {
     @AppStorage(AppLanguagePreference.userDefaultsKey) private var appLanguagePreference = AppLanguagePreference
         .systemValue
     @AppStorage(RecorderDisplaySettingsKeys.showLiveTranscript) private var showLiveTranscript = true
+    @AppStorage(RecorderDisplaySettingsKeys.liveTranscriptTextSize) private var liveTextSize: LiveTranscriptTextSize = .standard
     @AppStorage(FinishAndSendSettings.key) private var finishAndSendKey = FinishAndSendKey.none.rawValue
     @State private var showResetOnboardingAlert = false
     @State private var showLanguageRestartAlert = false
@@ -227,6 +228,15 @@ struct SettingsView: View {
                         InfoTip("Shows live text while recording with realtime models.")
                     }
                 }
+
+                // [custom] Font size of the live text (Large = 2x, with a larger panel).
+                Picker("Live Text Size", selection: $liveTextSize) {
+                    ForEach(LiveTranscriptTextSize.allCases) { size in
+                        Text(size.displayName).tag(size)
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(!showLiveTranscript)
             }
 
             Section("General") {

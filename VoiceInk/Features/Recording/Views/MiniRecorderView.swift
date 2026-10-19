@@ -8,12 +8,14 @@ struct MiniRecorderView<S: RecorderStateProvider & ObservableObject>: View {
     let onCloseTapped: () -> Void
     let onAssistantFollowUp: (String) -> Void
     @AppStorage(RecorderDisplaySettingsKeys.showLiveTranscript) private var showLiveTranscript = true
+    @AppStorage(RecorderDisplaySettingsKeys.liveTranscriptTextSize) private var liveTextSize: LiveTranscriptTextSize = .standard
 
     // MARK: - Layout Constants
 
     private let controlBarHeight: CGFloat = 40
     private let compactWidth: CGFloat = 184
-    private let expandedWidth: CGFloat = 300
+    // [custom] Wider for large live text; the host window is 540pt wide (MiniRecorderPanel).
+    private var expandedWidth: CGFloat { liveTextSize == .large ? 520 : 300 }
     private let assistantWidth: CGFloat = 520
     private let compactCornerRadius: CGFloat = 20
     private let expandedCornerRadius: CGFloat = 14
@@ -73,7 +75,7 @@ struct MiniRecorderView<S: RecorderStateProvider & ObservableObject>: View {
     private var transcriptSection: some View {
         VStack(spacing: 0) {
             if hasLiveTranscript {
-                LiveTranscriptView(text: stateProvider.partialTranscript)
+                LiveTranscriptView(text: stateProvider.partialTranscript, textSize: liveTextSize)
                 Divider().background(Color.white.opacity(0.15))
             }
         }

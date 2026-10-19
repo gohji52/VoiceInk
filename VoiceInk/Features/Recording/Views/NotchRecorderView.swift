@@ -8,6 +8,7 @@ struct NotchRecorderView<S: RecorderStateProvider & ObservableObject>: View {
     let onCloseTapped: () -> Void
     let onAssistantFollowUp: (String) -> Void
     @AppStorage(RecorderDisplaySettingsKeys.showLiveTranscript) private var showLiveTranscript = true
+    @AppStorage(RecorderDisplaySettingsKeys.liveTranscriptTextSize) private var liveTextSize: LiveTranscriptTextSize = .standard
     /// Bumped on every screen reconfiguration to invalidate the view. The notch metrics below
     /// come from AppKit, which SwiftUI cannot observe on its own, so without this the view keeps
     /// whatever sizes it happened to compute the last time it was rendered.
@@ -72,10 +73,11 @@ struct NotchRecorderView<S: RecorderStateProvider & ObservableObject>: View {
     // MARK: - Layout Constants
 
     private let recordingSideExpansion: CGFloat = 90
-    private let transcriptSideExpansion: CGFloat = 110
+    // [custom] Wider and taller for large live text; the host window allows up to 240pt per side.
+    private var transcriptSideExpansion: CGFloat { liveTextSize == .large ? 230 : 110 }
     private let assistantSideExpansion: CGFloat = 230
     private let activeHeightBonus: CGFloat = 6
-    private let transcriptPanelHeight: CGFloat = 57
+    private var transcriptPanelHeight: CGFloat { liveTextSize.transcriptHeight + 1 }
     private let assistantPanelHeight: CGFloat = 320
 
     private var mainRowHeight: CGFloat { notchHeight + activeHeightBonus }
@@ -218,7 +220,7 @@ struct NotchRecorderView<S: RecorderStateProvider & ObservableObject>: View {
         VStack(spacing: 0) {
             if displayState == .liveText {
                 Divider().background(Color.white.opacity(0.15))
-                LiveTranscriptView(text: stateProvider.partialTranscript)
+                LiveTranscriptView(text: stateProvider.partialTranscript, textSize: liveTextSize)
                     .padding(.horizontal, 8)
             }
         }
