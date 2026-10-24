@@ -67,11 +67,15 @@ class CursorPaster {
         let startedAt = ProcessInfo.processInfo.systemUptime
         let queueWaitMs = elapsedMilliseconds(since: requestedAt)
         let sessionID = UUID().uuidString
-        let method = PasteMethod.current()
+        // [custom] 長い文は Direct Typing だと途中から捨てられるので貼り付けにする（PasteRoutePolicy）
+        let configuredMethod = PasteMethod.current()
+        let method = PasteRoutePolicy.effectiveMethod(configured: configuredMethod, text: text)
         let textToDeliver = method == .directTyping ? DirectTextTyper.normalizedText(text) : text
         let pasteboard: NSPasteboard? = method.usesClipboard ? NSPasteboard.general : nil
         let shouldRestoreClipboard = pasteboard != nil
-            && UserDefaults.standard.bool(forKey: "restoreClipboardAfterPaste")
+            && PasteRoutePolicy.shouldRestoreClipboard(
+                configured: configuredMethod, effective: method,
+                userSetting: UserDefaults.standard.bool(forKey: "restoreClipboardAfterPaste"))
         let savedContents: ClipboardSnapshot
         if let pasteboard {
             savedContents = shouldRestoreClipboard ? snapshotClipboard(from: pasteboard) : []
