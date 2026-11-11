@@ -132,6 +132,9 @@ actor AutoLearnPendingQueue {
                 in: .whitespacesAndNewlines
             )
             guard !originalText.isEmpty, !correctedText.isEmpty else { continue }
+            // [custom] 文まるごとの候補は、ボタンの文字などの取り違えなので貯めない（2026-11-11）。
+            // 実例: 「11月6日からの韓国 → ChatGPT に聞く」
+            guard !WordReplacementSafetyPolicy.looksLikeSentence(originalText) else { continue }
 
             let correctionPairKey = pairKey(
                 originalText: originalText,

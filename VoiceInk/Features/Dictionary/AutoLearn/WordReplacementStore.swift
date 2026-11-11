@@ -181,6 +181,8 @@ actor WordReplacementStore {
         let destinationSourceKey = WordReplacementVariants.key(for: destination)
 
         guard !source.contains(",") else { throw MutationError.invalidReplacementSource }
+        // [custom] 1文字・数字だけ・文まるごとは置換にしない。語彙だけの学習は続ける（2026-11-11）
+        guard WordReplacementSafetyPolicy.isSafe(source: source) else { return (false, false) }
         guard !source.isEmpty, !destination.isEmpty,
             !sourceKey.isEmpty, !destinationKey.isEmpty,
             source != destination,

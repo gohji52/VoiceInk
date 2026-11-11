@@ -187,6 +187,10 @@ enum DictionaryService {
         let destination = replacement.trimmingCharacters(in: .whitespacesAndNewlines)
             .precomposedStringWithCanonicalMapping
         guard !tokens.isEmpty, !destination.isEmpty else { return nil }
+        // [custom] 普通の入力を壊す置換（1文字・数字だけ・文まるごと）は登録させない（2026-11-11）
+        if let problem = WordReplacementSafetyPolicy.firstProblem(inSources: tokens) {
+            return problem
+        }
 
         let destinationKey = WordReplacementVariants.destinationKey(for: destination)
 
@@ -269,6 +273,10 @@ enum DictionaryService {
         let destination = replacementText.trimmingCharacters(in: .whitespacesAndNewlines)
             .precomposedStringWithCanonicalMapping
         guard !tokens.isEmpty, !destination.isEmpty else { return nil }
+        // [custom] 普通の入力を壊す置換（1文字・数字だけ・文まるごと）は登録させない（2026-11-11）
+        if let problem = WordReplacementSafetyPolicy.firstProblem(inSources: tokens) {
+            return problem
+        }
 
         let existing: [WordReplacement]
         do {

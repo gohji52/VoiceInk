@@ -29,13 +29,13 @@ final class WordReplacementService {
     private init() {}
 
     func applyReplacements(to text: String, using context: ModelContext) -> String {
-        // `isEnabled` is retained only for store and CloudKit compatibility.
-        // Replacement rules are intentionally always active.
+        // [custom] 無効（isEnabled == false）の置換はかけない（2026-11-11）。
+        // 本家は isEnabled を無視して常にかけるため、無効にしても「音 → ウォン」が効き続けた。
         let descriptor = FetchDescriptor<WordReplacement>()
 
         let replacements: [WordReplacement]
         do {
-            replacements = try context.fetch(descriptor)
+            replacements = try context.fetch(descriptor).filter { $0.isEnabled }
         } catch {
             logger.error("Could not load word replacements: \(error, privacy: .public)")
             return text
@@ -116,7 +116,14 @@ final class WordReplacementService {
 
         let sortedRules = records
             .flatMap { record in
-                WordReplacementVariants.parse(record.originalText).map {
+                // [custom] 1文字・数字だけ・文まるごとの元の語は、登録されていてもかけない（2026-11-11）。
+                WordReplacementVariants.parse(record.originalText).filter { source in
+                    let safe = WordReplacementSafetyPolicy.isSafe(source: source)
+                    if !safe {
+                        logger.notice("Skipped unsafe word replacement source \(source, privacy: .private)")
+                    }
+                    return safe
+                }.map {
                     (
                         original: $0,
                         replacement: record.replacementText,
